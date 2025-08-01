@@ -1,0 +1,176 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== ENUMS =====
+enum Role {
+  USER
+  ADMIN
+  SUPERADMIN
+}
+
+enum ServiceType {
+  CALIBRACION
+  REPARACION
+  AMBOS
+}
+
+enum RmaStatus {
+  RMA_SUBMITTED
+  AWAITING_GOODS
+  EVALUATING
+  PROCESSING
+  PAYMENT
+  IN_SHIPPING
+  COMPLETE
+  REJECTED
+}
+
+// ===== MODELS =====
+
+model User {
+  id        String   @id @default(cuid())
+  nombre    String
+  apellido  String
+  direccion String
+  telefono  String
+  empresa   String
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  countries UserCountry[] // Países asignados (Admin puede tener varios)
+  rmas      Rma[]         // RMAs creados por el usuario
+
+  @@map("users")
+}
+
+model Country {
+  id     String @id @default(cuid())
+  nombre String @unique
+
+  // Relaciones
+  users    UserCountry[]    // Usuarios asignados a este país
+  products ProductCountry[] // Productos disponibles en este país
+  brands   BrandCountry[]   // Marcas disponibles en este país
+  rmas     Rma[]            // RMAs de este país
+
+  @@map("countries")
+}
+
+model Brand {
+  id     String @id @default(cuid())
+  nombre String
+
+  // Relaciones
+  countries BrandCountry[] // Países donde está disponible la marca
+  products  Product[]      // Productos de esta marca
+
+  @@map("brands")
+}
+
+model Product {
+  id     String @id @default(cuid())
+  nombre String
+  brandId String
+
+  // Relaciones
+  brand     Brand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  countries ProductCountry[]  // Países donde está disponible el producto
+  rmaItems  RmaProduct[]      // Productos en RMAs
+
+  @@map("products")
+}
+
+model Rma {
+  id              String    @id @default(cuid())
+  userId          String
+  countryId       String
+  nombreEmpresa   String    // Tomado del usuario que lo crea
+  direccion       String
+  codigoPostal    String
+  servicio        ServiceType
+  status          RmaStatus @default(RMA_SUBMITTED)
+  numeroTracking  String?
+  razonRechazo    String?
+  cotizacion      String?   // Podría ser JSON o texto
+  ordenCompra     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relaciones
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  country     Country       @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  products    RmaProduct[]  // Productos vinculados al RMA
+
+  @@map("rmas")
+}
+
+// ===== TABLAS DE UNIÓN (Many-to-Many) =====
+
+// Usuarios y Países (Admin puede tener varios países)
+model UserCountry {
+  userId    String
+  countryId String
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  country Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+
+  @@id([userId, countryId])
+  @@map("user_countries")
+}
+
+// Productos y Países
+model ProductCountry {
+  productId String
+  countryId String
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  country Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, countryId])
+  @@map("product_countries")
+}
+
+// Marcas y Países
+model BrandCountry {
+  brandId   String
+  countryId String
+
+  brand   Brand   @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  country Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+
+  @@id([brandId, countryId])
+  @@map("brand_countries")
+}
+
+// Productos en RMA (con serial y reporte individual)
+model RmaProduct {
+  id                  String  @id @default(cuid())
+  rmaId               String
+  productId           String
+  serial              String
+  reporteEvaluacion   String? // Reporte específico para este producto
+  model               String
+
+  rma     Rma     @relation(fields: [rmaId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([rmaId, productId, serial]) // Un serial único por producto por RMA
+  @@map("rma_products")
+}
