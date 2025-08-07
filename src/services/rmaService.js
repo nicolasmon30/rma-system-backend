@@ -349,6 +349,75 @@ class RmaService {
             throw error;
         }
     }
+
+    /**
+     * Cambia el estado del RMA a EVALUATING (cuando se reciben los bienes)
+     * @param {String} rmaId - ID del RMA
+     * @returns {Object} RMA actualizado
+     */
+    async markAsEvaluating(rmaId) {
+        try {
+            // Verificar que el RMA existe y está en estado AWAITING_GOODS
+            const rma = await prisma.rma.findUnique({
+                where: { id: rmaId },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            apellido: true,
+                            email: true
+                        }
+                    }
+                }
+            });
+
+            if (!rma) {
+                throw new Error('RMA no encontrado');
+            }
+
+            if (rma.status !== 'AWAITING_GOODS') {
+                throw new Error('Solo se pueden evaluar RMAs en estado AWAITING_GOODS');
+            }
+
+            if (!rma.numeroTracking) {
+                throw new Error('El RMA no tiene número de tracking asignado');
+            }
+
+            // Actualizar el estado
+            const updatedRma = await prisma.rma.update({
+                where: { id: rmaId },
+                data: {
+                    status: 'EVALUATING',
+                    updatedAt: new Date()
+                },
+                include: {
+                    user: true,
+                    products: {
+                        include: {
+                            product: {
+                                include: {
+                                    brand: true
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            await emailService.sendRmaEvaluatingEmail({
+                nombre: rma.user.nombre,
+                apellido: rma.user.apellido,
+                email: rma.user.email,
+                trackingNumber: rma.numeroTracking,
+                rmaId: rma.id
+            });
+
+            return updatedRma;
+        } catch (error) {
+            throw error;
+        }
+    }
 }
 
 module.exports = new RmaService();

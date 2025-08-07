@@ -3,6 +3,7 @@ const { resend } = require('../../config/resend');
 const welcomeTemplates = require('./templates/welcomeEmail');
 const rmaApprovedTemplates = require('./templates/rmaApproved');
 const rmaRejectedTemplates = require('./templates/rmaRejected');
+const rmaEvaluatingTemplates = require('./templates/rmaEvaluating');
 
 class EmailService {
   // ===== HELPERS =====
@@ -57,6 +58,15 @@ class EmailService {
       subject: `Tu RMA #${rmaId} ha sido rechazado`,
       html: rmaRejectedTemplates.getRmaRejectedTemplate({ nombre, apellido, rejectionReason, rmaId }),
       text: rmaRejectedTemplates.getRmaRejectedText({ nombre, apellido, rejectionReason, rmaId })
+    });
+  }
+
+  async sendRmaEvaluatingEmail({nombre, apellido, email, trackingNumber, rmaId}){
+    return this._sendEmail({
+      to: [email],
+      subject: `Tu RMA #${rmaId} está en evaluación`,
+      html: rmaEvaluatingTemplates.getRmaEvaluatingTemplate({nombre,apellido,trackingNumber,rmaId}),
+      text: rmaEvaluatingTemplates.getRmaEvaluatingText({nombre,apellido,trackingNumber,rmaId})
     });
   }
 

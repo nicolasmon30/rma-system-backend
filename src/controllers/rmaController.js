@@ -96,6 +96,24 @@ class RmaController {
             return errorResponse(res, error.message || 'Error al rechazar el RMA', 400);
         }
     }
+
+    /**
+     * Marcar RMA como en evaluación
+     * @param {Object} req - Request object
+     * @param {Object} res - Response object
+     */
+    async markAsEvaluating(req, res) {
+        try {
+            const { rmaId } = req.params;
+            
+            const updatedRma = await rmaService.markAsEvaluating(rmaId);
+            
+            return successResponse(res, updatedRma, 'RMA marcado como en evaluación', 200);
+        } catch (error) {
+            console.error('Error al marcar RMA como en evaluación:', error);
+            return errorResponse(res, error.message || 'Error al actualizar el estado del RMA', 400);
+        }
+    }
 }
 
 module.exports = new RmaController();

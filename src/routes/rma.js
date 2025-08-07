@@ -10,6 +10,7 @@ const {
   validateCreateRma,
   handleValidationErrors
 } = require('../utils/validators');
+const { validateRmaStatusTransition } = require('../middleware/validateRmaStatus');
 
 
 /**
@@ -69,6 +70,18 @@ router.patch('/:rmaId/reject',
   ],
   handleValidationErrors,
   rmaController.rejectRma
+);
+
+/**
+ * @route   PATCH /api/rma/:rmaId/mark-evaluating
+ * @desc    Marcar RMA como en evaluación
+ * @access  Private (ADMIN o SUPERADMIN)
+ */
+router.patch('/:rmaId/mark-evaluating',
+  authenticateToken,
+  filterRmasByRole(), // Middleware que filtra por rol
+  validateRmaStatusTransition(['AWAITING_GOODS']),
+  rmaController.markAsEvaluating
 );
 
 
