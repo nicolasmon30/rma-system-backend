@@ -1,4 +1,5 @@
 const { prisma } = require('../config/database');
+const emailService = require('./email/emailService');
 
 class RmaService {
     /**
@@ -116,18 +117,20 @@ class RmaService {
         }
     }
     /**
-       * Obtiene RMAs del usuario con filtros
-       * @param {String} userId - ID del usuario
-       * @param {Object} filters - Filtros a aplicar
-       * @returns {Array} Lista de RMAs
-       */
-    async getUserRmas(userId, filters = {}) {
+     * Obtiene RMAs con filtros flexibles
+     * @param {Object} filters - Filtros a aplicar
+     * @returns {Array} Lista de RMAs
+    */
+    async getUserRmas(filters = {}) {
         try {
-            const { status, startDate, endDate } = filters;
+            const { userId, countryId, status, startDate, endDate } = filters;
+
+            // Construir el where clause
             const whereClause = {
-                userId,
+                ...(userId && { userId }),
+                ...(countryId && { countryId }),
                 ...(status && { status }),
-                ...(startDate && endDAte && {
+                ...(startDate && endDate && {
                     createdAt: {
                         gte: new Date(startDate),
                         lte: new Date(endDate)
@@ -159,13 +162,189 @@ class RmaService {
                                 }
                             }
                         }
+                    },
+                    user: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            apellido: true,
+                            email: true,
+                            empresa: true
+                        }
                     }
                 },
                 orderBy: {
                     createdAt: 'desc'
                 }
             });
+
             return rmas;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    /**
+     * Aprobar un RMA (cambia estado y genera número de tracking)
+     * @param {String} rmaId - ID del RMA
+     * @param {String} userId - ID del usuario que aprueba (para registro)
+     * @returns {Object} RMA actualizado
+     */
+    async approveRma(rmaId, userId) {
+        try {
+            const rma = await prisma.rma.findUnique({
+                where: { id: rmaId },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            apellido: true,
+                            email: true
+                        }
+                    }
+                }
+            });
+
+            if (!rma) {
+                throw new Error('RMA no encontrado');
+            }
+
+            const trackingNumber = `TRK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            const updateRma = await prisma.rma.update({
+                where: { id: rmaId },
+                data: {
+                    status: 'AWAITING_GOODS',
+                    numeroTracking: trackingNumber,
+                    updatedAt: new Date()
+                },
+                include: {
+                    country: {
+                        select: {
+                            id: true,
+                            nombre: true
+                        }
+                    },
+                    products: {
+                        include: {
+                            product: {
+                                select: {
+                                    id: true,
+                                    nombre: true,
+                                    brand: {
+                                        select: {
+                                            id: true,
+                                            nombre: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    user: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            apellido: true,
+                            email: true
+                        }
+                    }
+                }
+            });
+            // Aquí podrías añadir lógica para notificar al usuario
+            await emailService.sendRmaApprovedEmail({
+                nombre: rma.user.nombre,
+                apellido: rma.user.apellido,
+                email: rma.user.email,
+                trackingNumber,
+                rmaId: rma.id
+            })
+            return updateRma;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    /**
+     * Rechazar un RMA (cambia estado y registra razón)
+     * @param {String} rmaId - ID del RMA
+     * @param {String} rejectionReason - Razón del rechazo
+     * @param {String} userId - ID del usuario que rechaza (para registro)
+     * @returns {Object} RMA actualizado
+     */
+    async rejectRma(rmaId, rejectionReason, userId) {
+        try {
+            if (!rejectionReason || rejectionReason.trim() === '') {
+                throw new Error('La razón de reachzo es requerida');
+            }
+            const rma = await prisma.rma.findUnique({
+                where: { id: rmaId },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            apellido: true,
+                            email: true
+                        }
+                    }
+                }
+            });
+
+            if (!rma) {
+                throw new Error('RMA no encontrado');
+            }
+            const updatedRma = await prisma.rma.update({
+                where: { id: rmaId },
+                data: {
+                    status: 'REJECTED',
+                    razonRechazo: rejectionReason,
+                    updatedAt: new Date()
+                },
+                include: {
+                    country: {
+                        select: {
+                            id: true,
+                            nombre: true
+                        }
+                    },
+                    products: {
+                        include: {
+                            product: {
+                                select: {
+                                    id: true,
+                                    nombre: true,
+                                    brand: {
+                                        select: {
+                                            id: true,
+                                            nombre: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    user: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            apellido: true,
+                            email: true
+                        }
+                    }
+                }
+            });
+
+            // Aquí podrías añadir lógica para notificar al usuario
+            await emailService.sendRmaRejectedEmail({
+                nombre: rma.user.nombre,
+                apellido: rma.user.apellido,
+                email: rma.user.email,
+                rejectionReason,
+                rmaId: rma.id
+            });
+
+            return updatedRma;
         } catch (error) {
             throw error;
         }

@@ -1,23 +1,29 @@
 const express = require('express');
-const { query } = require('express-validator');
+const { query, body } = require('express-validator');
 const router = express.Router();
 const { RmaStatus } = require('../generated/prisma/client');
 
 const rmaController = require('../controllers/rmaController');
 const { authenticateToken } = require('../middleware/auth');
-const { 
-    validateCreateRma,
-    handleValidationErrors 
+const { filterRmasByRole } = require('../middleware/rmaPermissions');
+const {
+  validateCreateRma,
+  handleValidationErrors
 } = require('../utils/validators');
 
 
 /**
- * @route   GET /
- * @desc    Obtener todos los RMAs del usuario
+ * @route   GET /api/rma
+ * @desc    Obtener todos los RMAs según el rol del usuario
  * @access  Private
+ * @permissions 
+ *   - USER: solo sus propios RMAs
+ *   - ADMIN: solo RMAs de sus países
+ *   - SUPERADMIN: todos los RMAs
  */
 router.get('/',
   authenticateToken,
+  filterRmasByRole(),
   [
     query('status').optional().isIn(Object.values(RmaStatus)),
     query('startDate').optional().isISO8601(),
@@ -38,6 +44,33 @@ router.post('/',
   handleValidationErrors,
   rmaController.createRma
 );
+
+/**
+ * @route   PATCH /api/rma/:rmaId/approve
+ * @desc    Aprobar un RMA
+ * @access  Private (ADMIN o SUPERADMIN)
+ */
+router.patch('/:rmaId/approve',
+  authenticateToken,
+  filterRmasByRole(), // Middleware que filtra por rol
+  rmaController.approveRma
+);
+
+/**
+ * @route   PATCH /api/rma/:rmaId/reject
+ * @desc    Rechazar un RMA
+ * @access  Private (ADMIN o SUPERADMIN)
+ */
+router.patch('/:rmaId/reject',
+  authenticateToken,
+  filterRmasByRole(), // Middleware que filtra por rol
+  [
+    body('rejectionReason').notEmpty().withMessage('La razón de rechazo es requerida')
+  ],
+  handleValidationErrors,
+  rmaController.rejectRma
+);
+
 
 
 module.exports = router;

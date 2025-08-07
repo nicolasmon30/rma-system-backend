@@ -2,7 +2,7 @@
 const { prisma } = require('../config/database');
 const { hashPassword, comparePassword } = require('../utils/bcrypt');
 const { generateToken } = require('../config/jwt');
-const emailService = require('./emailService');
+const emailService = require('../services/email/emailService');
 
 class AuthService {
   /**
