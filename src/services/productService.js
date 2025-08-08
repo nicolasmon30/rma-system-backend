@@ -11,6 +11,7 @@ class ProductService {
      */
     async createProduct({ nombre, brandId, countryIds }) {
         try {
+            console.log("contriidsSelect", countryIds)
             // Verificar que el producto no exista
             const existingProduct = await prisma.product.findFirst({
                 where: {

@@ -4,7 +4,7 @@
  * Middleware que aplica filtros de productos según el rol del usuario
  * USER: no puede acceder a productos (se manejará en las rutas)
  * ADMIN: solo ve productos de sus países asignados
- * SUPERADMIN: ve todas los productos sin restricciones
+ * SUPERADMIN: ve todos los productos sin restricciones
  */
 function filterProductsByRole() {
     return (req, res, next) => {
@@ -29,7 +29,7 @@ function filterProductsByRole() {
                     // Los usuarios normales no deberían poder acceder a productos
                     return res.status(403).json({
                         success: false,
-                        message: 'No tienes permisos para acceder a las productos'
+                        message: 'No tienes permisos para acceder a los productos'
                     });
 
                 case 'ADMIN':
@@ -54,7 +54,7 @@ function filterProductsByRole() {
                     break;
 
                 case 'SUPERADMIN':
-                    // Superadmin: sin filtros, ve todas las productos
+                    // Superadmin: sin filtros, ve todos los productos
                     console.log('SUPERADMIN: sin filtros, acceso total a productos');
                     break;
 
