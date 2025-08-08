@@ -11,6 +11,7 @@ const {
   handleValidationErrors
 } = require('../utils/validators');
 const { validateRmaStatusTransition } = require('../middleware/validateRmaStatus');
+const upload = require('../config/multer');
 
 
 /**
@@ -82,6 +83,15 @@ router.patch('/:rmaId/mark-evaluating',
   filterRmasByRole(), // Middleware que filtra por rol
   validateRmaStatusTransition(['AWAITING_GOODS']),
   rmaController.markAsEvaluating
+);
+
+router.patch(
+  '/:rmaId/mark-payment',
+  authenticateToken,
+  filterRmasByRole(),
+  validateRmaStatusTransition(['EVALUATING']),
+  upload.single('cotizacion'), // Campo del form-data con el PDF
+  rmaController.markAsPayment
 );
 
 

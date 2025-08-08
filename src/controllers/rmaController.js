@@ -114,6 +114,24 @@ class RmaController {
             return errorResponse(res, error.message || 'Error al actualizar el estado del RMA', 400);
         }
     }
+
+    async markAsPayment(req, res) {
+        try {
+        const { rmaId } = req.params;
+        
+        if (!req.file) {
+            return errorResponse(res, 'La cotización en PDF es requerida', 400);
+        }
+
+        const updatedRma = await rmaService.markAsPayment(rmaId, req.file);
+        
+        return successResponse(res, updatedRma, 'RMA actualizado a PAYMENT con cotización', 200);
+        } catch (error) {
+        return errorResponse(res, error.message || 'Error al procesar la cotización', 400);
+        }
+    }
+
+
 }
 
 module.exports = new RmaController();

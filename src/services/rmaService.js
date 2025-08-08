@@ -1,5 +1,6 @@
 const { prisma } = require('../config/database');
 const emailService = require('./email/emailService');
+const storageService = require('./storageService');
 
 class RmaService {
     /**
@@ -418,6 +419,54 @@ class RmaService {
             throw error;
         }
     }
+
+    async markAsPayment(rmaId, file) {
+    let quotationUrl;
+    try {
+      // Validaciones del RMA...
+      const rma = await prisma.rma.findUnique({
+        where: { id: rmaId },
+        include: { user: true }
+      });
+
+
+      if (!rma) throw new Error('RMA no encontrado');
+      if (rma.status !== 'EVALUATING') throw new Error('Estado inválido para esta operación');
+
+
+      // Subir a la carpeta quotations
+      quotationUrl = await storageService.uploadQuotation(file);
+
+      // Actualizar RMA
+      const updatedRma = await prisma.rma.update({
+        where: { id: rmaId },
+        data: {
+          status: 'PAYMENT',
+          cotizacion: quotationUrl, // Guardamos la URL completa
+          updatedAt: new Date()
+        },
+        include: { user: true }
+      });
+
+      // Enviar email con la cotización
+      await emailService.sendRmaPaymentEmail({
+        nombre: rma.user.nombre,
+        apellido: rma.user.apellido,
+        email: rma.user.email,
+        rmaId: rma.id,
+        cotizacionUrl
+      });
+
+      return updatedRma;
+    } catch (error) {
+      // Rollback en caso de error
+      if (quotationUrl) {
+        await storageService.deleteFile(quotationUrl).catch(console.error);
+      }
+      throw error;
+    }
+  }
+
 }
 
 module.exports = new RmaService();
