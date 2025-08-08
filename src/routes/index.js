@@ -6,6 +6,7 @@ const authRoutes = require('./auth');
 const countryRoutes = require('./countries');
 const rmaRoutes = require('./rma');
 const userRoutes = require('./users');
+const brandRoutes = require('./brand');
 
 // Ruta de prueba inicial
 router.get('/test', (req, res) => {
@@ -22,6 +23,7 @@ router.use('/auth', authRoutes);
 router.use('/countries', countryRoutes);
 router.use('/rma', rmaRoutes);
 router.use('/users', userRoutes);
+router.use('/brands', brandRoutes);
 
 // Documentación básica de endpoints
 router.get('/docs', (req, res) => {

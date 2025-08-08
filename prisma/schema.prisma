@@ -76,7 +76,8 @@ model Country {
 model Brand {
   id     String @id @default(cuid())
   nombre String
-
+  createdAt  DateTime?  @default(now())
+  updatedAt       DateTime?  @updatedAt
   // Relaciones
   countries BrandCountry[] // Países donde está disponible la marca
   products  Product[]      // Productos de esta marca
@@ -88,7 +89,8 @@ model Product {
   id     String @id @default(cuid())
   nombre String
   brandId String
-
+  createdAt  DateTime?  @default(now())
+  updatedAt       DateTime?  @updatedAt
   // Relaciones
   brand     Brand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
   countries ProductCountry[]  // Países donde está disponible el producto
