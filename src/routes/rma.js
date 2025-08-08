@@ -106,6 +106,35 @@ router.patch('/:rmaId/mark-processing',
   rmaController.markAsProcessing
 );
 
+/**
+ * @route   PATCH /api/rma/:rmaId/mark-inshipping
+ * @desc    Marcar RMA como IN SHIPPING
+ * @access  Private (ADMIN o SUPERADMIN)
+ */
+router.patch('/:rmaId/mark-inshipping',
+  authenticateToken,
+  filterRmasByRole(),
+  validateRmaStatusTransition(['PROCESSING']),
+  [
+    body('trackingInformation').notEmpty().withMessage('La información de Tracking es requerida')
+  ],
+  handleValidationErrors,
+  rmaController.markAsInShipping
+);
+
+/**
+ * @route   PATCH /api/rma/:rmaId/mark-complete
+ * @desc    Marcar RMA como COMPLETE (proceso finalizado)
+ * @access  Private (ADMIN o SUPERADMIN)
+ */
+router.patch('/:rmaId/mark-complete',
+  authenticateToken,
+  filterRmasByRole(), // Middleware que filtra por rol
+  validateRmaStatusTransition(['IN_SHIPPING']), // Solo desde IN_SHIPPING
+  rmaController.markAsComplete
+);
+
+
 
 
 module.exports = router;

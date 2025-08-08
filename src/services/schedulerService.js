@@ -179,7 +179,7 @@ class SchedulerService {
         email: rma.user.email,
         rmaId: rma.id,
         daysSincePayment,
-        cotizacionUrl: rma.cotizacion // Agregar URL de cotización si existe
+        cotizacion: rma.cotizacion // Agregar URL de cotización si existe
       });
 
     } catch (error) {

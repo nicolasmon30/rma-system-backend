@@ -182,6 +182,79 @@ class RmaController {
         }
     }
 
+    /**
+ * MArcar como In SHipping
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+    async markAsInShipping(req, res) {
+        try {
+            const { rmaId } = req.params;
+            const { trackingInformation } = req.body;
+            const userId = req.user.id; // Usuario que realiza la acción
+
+            if (!trackingInformation) {
+                return errorResponse(res, 'La informacion de  tracking es requerida', 400);
+            }
+
+            // Verificar permisos adicionales si es necesario
+            // (el middleware ya filtró los RMAs visibles)
+
+            const updatedRma = await rmaService.markAsInShipping(rmaId, trackingInformation, userId);
+            return successResponse(res, updatedRma, 'RMA marcado como IN_SHIPPING exitosamente', 200);
+        } catch (error) {
+            console.error('Error al marcar RMA como IN_SHIPPING:', error);
+            return errorResponse(res, error.message || 'Error al marcar RMA como IN_SHIPPING', 400);
+        }
+    }
+
+    /**
+ * Marcar RMA como COMPLETE (proceso finalizado)
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+    async markAsComplete(req, res) {
+        try {
+            const { rmaId } = req.params;
+            const userId = req.user.id;
+            const userRole = req.user.role;
+
+            console.log(`🎉 Completando RMA ${rmaId}`);
+            console.log(`👤 Solicitado por: ${req.user.email} (${userRole})`);
+
+            // Verificar permisos (solo ADMIN y SUPERADMIN pueden completar RMAs)
+            if (!['ADMIN', 'SUPERADMIN'].includes(userRole)) {
+                return errorResponse(res, 'No tienes permisos para realizar esta acción', 403);
+            }
+
+            // Llamar al servicio para actualizar el RMA
+            const updatedRma = await rmaService.markAsComplete(rmaId, userId);
+
+            console.log(`✅ RMA ${rmaId} completado exitosamente`);
+
+            return successResponse(
+                res,
+                updatedRma,
+                'RMA completado exitosamente. Email de notificación enviado al usuario.',
+                200
+            );
+
+        } catch (error) {
+            console.error('❌ Error en markAsComplete controller:', error);
+
+            // Manejar diferentes tipos de errores
+            if (error.message.includes('no encontrado')) {
+                return errorResponse(res, error.message, 404);
+            }
+
+            if (error.message.includes('No se puede completar') || error.message.includes('estado')) {
+                return errorResponse(res, error.message, 400);
+            }
+
+            return errorResponse(res, error.message || 'Error al completar RMA', 500);
+        }
+    }
+
 
 }
 

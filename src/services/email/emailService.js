@@ -10,6 +10,7 @@ const rmaEvaluatingTemplates = require('./templates/rmaEvaluating');
 const rmaPaymentTemplates = require('./templates/rmaPayment');
 const rmaProcessingTemplates = require('./templates/rmaProcessing');
 const paymentReminderTemplates = require('./templates/paymentReminder');
+const rmaInShippingTemplates = require('./templates/rmaInShipping');
 
 class EmailService {
   // ===== HELPERS =====
@@ -138,8 +139,6 @@ class EmailService {
       console.log(`📧 Preparando email de recordatorio para ${reminderData.email}`);
       console.log(`📊 Días transcurridos: ${reminderData.daysSincePayment}`);
 
-      const paymentReminderTemplates = require('./templates/paymentReminder');
-
       // Determinar urgencia del recordatorio
       const isUrgent = reminderData.daysSincePayment > 7;
       const isCritical = reminderData.daysSincePayment > 10;
@@ -173,6 +172,57 @@ class EmailService {
 
     } catch (error) {
       console.error('❌ Error en sendPaymentReminderEmail:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  async sendRmaInShippingEmail({ nombre, apellido, email, trackingInformation, rmaId }) {
+    return this._sendEmail({
+      to: [email],
+      subject: `Tu RMA #${rmaId} esta siendo enviado`,
+      html: rmaInShippingTemplates.getRmaInShippingTemplate({ nombre, apellido, trackingInformation, rmaId }),
+      text: rmaInShippingTemplates.getRmaInShippingText({ nombre, apellido, trackingInformation, rmaId })
+    });
+  }
+
+  /**
+ * Envía email cuando el RMA se completa
+ * @param {Object} completeData - Datos del RMA completado
+ * @param {string} completeData.nombre - Nombre del usuario
+ * @param {string} completeData.apellido - Apellido del usuario
+ * @param {string} completeData.email - Email del usuario
+ * @param {string} completeData.rmaId - ID del RMA
+ * @param {string} completeData.empresa - Empresa del usuario
+ * @param {string} completeData.servicioRealizado - Tipo de servicio realizado
+ * @returns {Object} Resultado del envío
+ */
+  async sendRmaCompleteEmail(completeData) {
+    try {
+      console.log(`🎉 Preparando email de RMA completado para ${completeData.email}`);
+
+      const rmaCompleteTemplates = require('./templates/rmaComplete');
+
+      const result = await this._sendEmail({
+        to: [completeData.email],
+        subject: `🎉 ¡RMA Completado Exitosamente! - #${completeData.rmaId}`,
+        html: rmaCompleteTemplates.getRmaCompleteTemplate(completeData),
+        text: rmaCompleteTemplates.getRmaCompleteText(completeData)
+      });
+
+      if (result.success) {
+        console.log(`✅ Email de RMA completado enviado exitosamente a ${completeData.email}`);
+        console.log(`📧 Email ID: ${result.emailId}`);
+      } else {
+        console.error(`❌ Error enviando email de RMA completado a ${completeData.email}:`, result.error);
+      }
+
+      return result;
+
+    } catch (error) {
+      console.error('❌ Error en sendRmaCompleteEmail:', error);
       return {
         success: false,
         error: error.message

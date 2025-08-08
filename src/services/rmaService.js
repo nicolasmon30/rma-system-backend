@@ -454,7 +454,7 @@ class RmaService {
                 apellido: rma.user.apellido,
                 email: rma.user.email,
                 rmaId: rma.id,
-                cotizacionUrl
+                quotationUrl
             });
 
             return updatedRma;
@@ -576,6 +576,256 @@ class RmaService {
         } catch (error) {
             console.error(`❌ Error marcando RMA ${rmaId} como PROCESSING:`, error);
             throw error;
+        }
+    }
+    /**
+     * Marcar RMA como IN_SHIPPING (equipo enviado)
+     * @param {String} rmaId - ID del RMA
+     * @param {String} trackingInformation - Información de tracking del envío
+     * @param {String} userId - ID del usuario que realiza la acción (opcional)
+     * @returns {Object} RMA actualizado
+     */
+    async markAsInShipping(rmaId, trackingInformation, userId = null) {
+        try {
+            // Verificar que el RMA existe y está en estado correcto
+            const rma = await prisma.rma.findUnique({
+                where: { id: rmaId },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            apellido: true,
+                            email: true
+                        }
+                    },
+                    products: {
+                        include: {
+                            product: {
+                                select: {
+                                    id: true,
+                                    nombre: true,
+                                    brand: {
+                                        select: {
+                                            id: true,
+                                            nombre: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (!rma) {
+                throw new Error('RMA no encontrado');
+            }
+
+            if (rma.status !== 'PROCESSING') {
+                throw new Error(`No se puede enviar un RMA en estado ${rma.status}. Solo se pueden enviar RMAs en estado PROCESSING`);
+            }
+
+            if (!trackingInformation || trackingInformation.trim() === '') {
+                throw new Error('La información de tracking es requerida');
+            }
+
+            // Actualizar el RMA a estado IN_SHIPPING
+            const updatedRma = await prisma.rma.update({
+                where: { id: rmaId },
+                data: {
+                    status: 'IN_SHIPPING',
+                    numeroTracking: trackingInformation, // Guardar tracking en el campo existente
+                    updatedAt: new Date()
+                },
+                include: {
+                    country: {
+                        select: {
+                            id: true,
+                            nombre: true
+                        }
+                    },
+                    products: {
+                        include: {
+                            product: {
+                                select: {
+                                    id: true,
+                                    nombre: true,
+                                    brand: {
+                                        select: {
+                                            id: true,
+                                            nombre: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    user: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            apellido: true,
+                            email: true,
+                            empresa: true
+                        }
+                    }
+                }
+            });
+
+            // Log de la acción realizada
+            console.log(`✅ RMA ${rmaId} marcado como IN_SHIPPING`);
+            console.log(`📦 Tracking: ${trackingInformation}`);
+            if (userId) {
+                console.log(`👤 Acción realizada por usuario: ${userId}`);
+            }
+
+            // Enviar email de confirmación al usuario
+            await emailService.sendRmaInShippingEmail({
+                nombre: rma.user.nombre,
+                apellido: rma.user.apellido,
+                email: rma.user.email,
+                rejectionReason,
+                rmaId: rma.id,
+                trackingInformation
+            });
+
+            return updatedRma;
+        } catch (error) {
+            console.error(`❌ Error marcando RMA ${rmaId} como IN_SHIPPING:`, error);
+            throw error;
+        }
+    }
+
+    /**
+ * Marcar RMA como COMPLETE (proceso finalizado)
+ * @param {String} rmaId - ID del RMA
+ * @param {String} userId - ID del usuario que realiza la acción (opcional)
+ * @returns {Object} RMA actualizado
+ */
+    async markAsComplete(rmaId, userId = null) {
+        try {
+            // Verificar que el RMA existe y está en estado correcto
+            const rma = await prisma.rma.findUnique({
+                where: { id: rmaId },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            apellido: true,
+                            email: true,
+                            empresa: true
+                        }
+                    },
+                    products: {
+                        include: {
+                            product: {
+                                select: {
+                                    id: true,
+                                    nombre: true,
+                                    brand: {
+                                        select: {
+                                            id: true,
+                                            nombre: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (!rma) {
+                throw new Error('RMA no encontrado');
+            }
+
+            if (rma.status !== 'IN_SHIPPING') {
+                throw new Error(`No se puede completar un RMA en estado ${rma.status}. Solo se pueden completar RMAs en estado IN_SHIPPING`);
+            }
+
+            // Actualizar el RMA a estado COMPLETE
+            const updatedRma = await prisma.rma.update({
+                where: { id: rmaId },
+                data: {
+                    status: 'COMPLETE',
+                    updatedAt: new Date()
+                },
+                include: {
+                    country: {
+                        select: {
+                            id: true,
+                            nombre: true
+                        }
+                    },
+                    products: {
+                        include: {
+                            product: {
+                                select: {
+                                    id: true,
+                                    nombre: true,
+                                    brand: {
+                                        select: {
+                                            id: true,
+                                            nombre: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    user: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            apellido: true,
+                            email: true,
+                            empresa: true
+                        }
+                    }
+                }
+            });
+
+            // Log de la acción realizada
+            console.log(`✅ RMA ${rmaId} marcado como COMPLETE`);
+            if (userId) {
+                console.log(`👤 Acción realizada por usuario: ${userId}`);
+            }
+
+            // Enviar email de confirmación al usuario
+            await this.sendCompleteConfirmationEmail(rma);
+
+            return updatedRma;
+        } catch (error) {
+            console.error(`❌ Error marcando RMA ${rmaId} como COMPLETE:`, error);
+            throw error;
+        }
+    }
+
+    /**
+ * Envía email de confirmación cuando el RMA se completa
+ * @param {Object} rma - Datos del RMA
+ */
+    async sendCompleteConfirmationEmail(rma) {
+        try {
+            const servicioRealizado = rma.servicio === 'CALIBRACION' ? 'Calibración'
+                : rma.servicio === 'REPARACION' ? 'Reparación'
+                    : 'Calibración y Reparación';
+
+            await emailService.sendRmaCompleteEmail({
+                nombre: rma.user.nombre,
+                apellido: rma.user.apellido,
+                email: rma.user.email,
+                rmaId: rma.id,
+                empresa: rma.user.empresa,
+                servicioRealizado: servicioRealizado
+            });
+
+            console.log(`📧 Email de RMA completado enviado para RMA ${rma.id}`);
+        } catch (error) {
+            console.error(`❌ Error enviando email de RMA completado para RMA ${rma.id}:`, error);
+            // No lanzar error aquí para no afectar la operación principal
         }
     }
 
