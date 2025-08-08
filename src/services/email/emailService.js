@@ -91,6 +91,7 @@ class EmailService {
   async sendRmaPaymentEmail({ nombre, apellido, email, rmaId, cotizacionUrl }) {
     try {
       // 1. Descargar el PDF temporalmente desde Supabase
+      console.log("cotizacionUrl", cotizacionUrl)
       const filePath = cotizacionUrl.split('/rma-files/')[1];
       const { data: pdfBuffer, error } = await supabase.storage
         .from('rma-files')
