@@ -12,7 +12,11 @@ const app = express();
 // Middlewares de seguridad
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'https://rma-system-frontend-production.up.railway.app/' || 'localhost_3001' ,
+  origin: [
+    process.env.FRONTEND_URL,
+    'https://rma-system-frontend-production.up.railway.app',
+    'http://localhost:3001'
+  ].filter(Boolean),  // Esto eliminará cualquier valor undefined/null
   credentials: true
 }));
 
