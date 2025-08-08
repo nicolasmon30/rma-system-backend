@@ -94,6 +94,18 @@ router.patch(
   rmaController.markAsPayment
 );
 
+/**
+ * @route   PATCH /api/rma/:rmaId/mark-processing
+ * @desc    Marcar RMA como PROCESSING (pausa recordatorios automáticos)
+ * @access  Private (ADMIN o SUPERADMIN)
+ */
+router.patch('/:rmaId/mark-processing',
+  authenticateToken,
+  filterRmasByRole(), // Middleware que filtra por rol
+  validateRmaStatusTransition(['PAYMENT']), // Solo desde PAYMENT
+  rmaController.markAsProcessing
+);
+
 
 
 module.exports = router;

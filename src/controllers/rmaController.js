@@ -105,9 +105,9 @@ class RmaController {
     async markAsEvaluating(req, res) {
         try {
             const { rmaId } = req.params;
-            
+
             const updatedRma = await rmaService.markAsEvaluating(rmaId);
-            
+
             return successResponse(res, updatedRma, 'RMA marcado como en evaluación', 200);
         } catch (error) {
             console.error('Error al marcar RMA como en evaluación:', error);
@@ -117,17 +117,68 @@ class RmaController {
 
     async markAsPayment(req, res) {
         try {
-        const { rmaId } = req.params;
-        
-        if (!req.file) {
-            return errorResponse(res, 'La cotización en PDF es requerida', 400);
-        }
+            const { rmaId } = req.params;
 
-        const updatedRma = await rmaService.markAsPayment(rmaId, req.file);
-        
-        return successResponse(res, updatedRma, 'RMA actualizado a PAYMENT con cotización', 200);
+            if (!req.file) {
+                return errorResponse(res, 'La cotización en PDF es requerida', 400);
+            }
+
+            const updatedRma = await rmaService.markAsPayment(rmaId, req.file);
+
+            return successResponse(res, updatedRma, 'RMA actualizado a PAYMENT con cotización', 200);
         } catch (error) {
-        return errorResponse(res, error.message || 'Error al procesar la cotización', 400);
+            return errorResponse(res, error.message || 'Error al procesar la cotización', 400);
+        }
+    }
+
+    /**
+ * Marcar RMA como PROCESSING (pausa recordatorios)
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+    async markAsProcessing(req, res) {
+        try {
+            const { rmaId } = req.params;
+            const userId = req.user.id;
+            const userRole = req.user.role;
+
+            console.log(`🔄 Procesando RMA ${rmaId} a estado PROCESSING`);
+            console.log(`👤 Solicitado por: ${req.user.email} (${userRole})`);
+
+            // Verificar permisos (solo ADMIN y SUPERADMIN pueden marcar como PROCESSING)
+            if (!['ADMIN', 'SUPERADMIN'].includes(userRole)) {
+                return errorResponse(res, 'No tienes permisos para realizar esta acción', 403);
+            }
+
+            // Llamar al servicio para actualizar el RMA
+            const updatedRma = await rmaService.markAsProcessing(rmaId, userId);
+
+            console.log(`✅ RMA ${rmaId} actualizado exitosamente a PROCESSING`);
+
+            return successResponse(
+                res,
+                updatedRma,
+                'RMA marcado como PROCESSING exitosamente. Los recordatorios de pago han sido pausados.',
+                200
+            );
+
+        } catch (error) {
+            console.error('❌ Error en markAsProcessing controller:', error);
+
+            // Manejar diferentes tipos de errores
+            if (error.message.includes('no encontrado')) {
+                return errorResponse(res, error.message, 404);
+            }
+
+            if (error.message.includes('No se puede procesar') || error.message.includes('estado')) {
+                return errorResponse(res, error.message, 400);
+            }
+
+            if (error.message.includes('cotización')) {
+                return errorResponse(res, error.message, 400);
+            }
+
+            return errorResponse(res, error.message || 'Error al marcar RMA como PROCESSING', 500);
         }
     }
 

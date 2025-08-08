@@ -421,51 +421,163 @@ class RmaService {
     }
 
     async markAsPayment(rmaId, file) {
-    let quotationUrl;
-    try {
-      // Validaciones del RMA...
-      const rma = await prisma.rma.findUnique({
-        where: { id: rmaId },
-        include: { user: true }
-      });
+        let quotationUrl;
+        try {
+            // Validaciones del RMA...
+            const rma = await prisma.rma.findUnique({
+                where: { id: rmaId },
+                include: { user: true }
+            });
 
 
-      if (!rma) throw new Error('RMA no encontrado');
-      if (rma.status !== 'EVALUATING') throw new Error('Estado inválido para esta operación');
+            if (!rma) throw new Error('RMA no encontrado');
+            if (rma.status !== 'EVALUATING') throw new Error('Estado inválido para esta operación');
 
 
-      // Subir a la carpeta quotations
-      quotationUrl = await storageService.uploadQuotation(file);
+            // Subir a la carpeta quotations
+            quotationUrl = await storageService.uploadQuotation(file);
 
-      // Actualizar RMA
-      const updatedRma = await prisma.rma.update({
-        where: { id: rmaId },
-        data: {
-          status: 'PAYMENT',
-          cotizacion: quotationUrl, // Guardamos la URL completa
-          updatedAt: new Date()
-        },
-        include: { user: true }
-      });
+            // Actualizar RMA
+            const updatedRma = await prisma.rma.update({
+                where: { id: rmaId },
+                data: {
+                    status: 'PAYMENT',
+                    cotizacion: quotationUrl, // Guardamos la URL completa
+                    updatedAt: new Date()
+                },
+                include: { user: true }
+            });
 
-      // Enviar email con la cotización
-      await emailService.sendRmaPaymentEmail({
-        nombre: rma.user.nombre,
-        apellido: rma.user.apellido,
-        email: rma.user.email,
-        rmaId: rma.id,
-        cotizacionUrl
-      });
+            // Enviar email con la cotización
+            await emailService.sendRmaPaymentEmail({
+                nombre: rma.user.nombre,
+                apellido: rma.user.apellido,
+                email: rma.user.email,
+                rmaId: rma.id,
+                cotizacionUrl
+            });
 
-      return updatedRma;
-    } catch (error) {
-      // Rollback en caso de error
-      if (quotationUrl) {
-        await storageService.deleteFile(quotationUrl).catch(console.error);
-      }
-      throw error;
+            return updatedRma;
+        } catch (error) {
+            // Rollback en caso de error
+            if (quotationUrl) {
+                await storageService.deleteFile(quotationUrl).catch(console.error);
+            }
+            throw error;
+        }
     }
-  }
+
+    /**
+ * Marcar RMA como PROCESSING (pausa recordatorios automáticamente)
+ * @param {String} rmaId - ID del RMA
+ * @param {String} userId - ID del usuario que realiza la acción (opcional, para logs)
+ * @returns {Object} RMA actualizado
+ */
+    async markAsProcessing(rmaId, userId = null) {
+        try {
+            // Verificar que el RMA existe y está en estado correcto
+            const rma = await prisma.rma.findUnique({
+                where: { id: rmaId },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            apellido: true,
+                            email: true
+                        }
+                    },
+                    products: {
+                        include: {
+                            product: {
+                                select: {
+                                    id: true,
+                                    nombre: true,
+                                    brand: {
+                                        select: {
+                                            id: true,
+                                            nombre: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (!rma) {
+                throw new Error('RMA no encontrado');
+            }
+
+            if (rma.status !== 'PAYMENT') {
+                throw new Error(`No se puede procesar un RMA en estado ${rma.status}. Solo se pueden procesar RMAs en estado PAYMENT`);
+            }
+
+            // Verificar que existe una cotización
+            if (!rma.cotizacion) {
+                throw new Error('El RMA no tiene cotización asociada');
+            }
+
+            // Actualizar el RMA a estado PROCESSING
+            const updatedRma = await prisma.rma.update({
+                where: { id: rmaId },
+                data: {
+                    status: 'PROCESSING',
+                    lastReminderSent: null, // 👈 ESTO PAUSA LOS RECORDATORIOS
+                    updatedAt: new Date()
+                },
+                include: {
+                    country: {
+                        select: {
+                            id: true,
+                            nombre: true
+                        }
+                    },
+                    products: {
+                        include: {
+                            product: {
+                                select: {
+                                    id: true,
+                                    nombre: true,
+                                    brand: {
+                                        select: {
+                                            id: true,
+                                            nombre: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    user: {
+                        select: {
+                            id: true,
+                            nombre: true,
+                            apellido: true,
+                            email: true,
+                            empresa: true
+                        }
+                    }
+                }
+            });
+
+            // Log de la acción realizada
+            console.log(`✅ RMA ${rmaId} marcado como PROCESSING`);
+            console.log(`📧 Recordatorios automáticos pausados para RMA ${rmaId}`);
+            if (userId) {
+                console.log(`👤 Acción realizada por usuario: ${userId}`);
+            }
+
+            // Enviar email de confirmación al usuario
+            await emailService.sendRmaProcessingEmail(rma)
+
+            return updatedRma;
+        } catch (error) {
+            console.error(`❌ Error marcando RMA ${rmaId} como PROCESSING:`, error);
+            throw error;
+        }
+    }
 
 }
 

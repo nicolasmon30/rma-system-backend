@@ -112,6 +112,7 @@ model Rma {
   ordenCompra     String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  lastReminderSent DateTime?
 
   // Relaciones
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)

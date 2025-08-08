@@ -8,6 +8,8 @@ const rmaApprovedTemplates = require('./templates/rmaApproved');
 const rmaRejectedTemplates = require('./templates/rmaRejected');
 const rmaEvaluatingTemplates = require('./templates/rmaEvaluating');
 const rmaPaymentTemplates = require('./templates/rmaPayment');
+const rmaProcessingTemplates = require('./templates/rmaProcessing');
+const paymentReminderTemplates = require('./templates/paymentReminder');
 
 class EmailService {
   // ===== HELPERS =====
@@ -18,7 +20,7 @@ class EmailService {
         to,
         subject,
         html,
-        text, 
+        text,
         attachments
       });
       console.log(`Email enviado exitosamente: ${data.id}`);
@@ -66,12 +68,21 @@ class EmailService {
     });
   }
 
-  async sendRmaEvaluatingEmail({nombre, apellido, email, trackingNumber, rmaId}){
+  async sendRmaEvaluatingEmail({ nombre, apellido, email, trackingNumber, rmaId, empresa }) {
     return this._sendEmail({
       to: [email],
       subject: `Tu RMA #${rmaId} está en evaluación`,
-      html: rmaEvaluatingTemplates.getRmaEvaluatingTemplate({nombre,apellido,trackingNumber,rmaId}),
-      text: rmaEvaluatingTemplates.getRmaEvaluatingText({nombre,apellido,trackingNumber,rmaId})
+      html: rmaEvaluatingTemplates.getRmaEvaluatingTemplate({ nombre, apellido, trackingNumber, rmaId, empresa }),
+      text: rmaEvaluatingTemplates.getRmaEvaluatingText({ nombre, apellido, trackingNumber, rmaId, empresa })
+    });
+  }
+
+  async sendRmaProcessingEmail({ nombre, apellido, email, trackingNumber, rmaId }) {
+    return this._sendEmail({
+      to: [email],
+      subject: `Tu RMA #${rmaId} está en Proceso`,
+      html: rmaProcessingTemplates.getRmaProcessingTemplate({ nombre, apellido, trackingNumber, rmaId }),
+      text: rmaProcessingTemplates.getRmaProcessingText({ nombre, apellido, trackingNumber, rmaId })
     });
   }
 
@@ -108,6 +119,64 @@ class EmailService {
     } catch (error) {
       console.error('Error en sendRmaPaymentEmail:', error);
       return { success: false, error: error.message };
+    }
+  }
+
+  /**
+ * Envía email de recordatorio de pago
+ * @param {Object} reminderData - Datos para el recordatorio
+ * @param {string} reminderData.nombre - Nombre del usuario
+ * @param {string} reminderData.apellido - Apellido del usuario
+ * @param {string} reminderData.email - Email del usuario
+ * @param {string} reminderData.rmaId - ID del RMA
+ * @param {number} reminderData.daysSincePayment - Días desde el último recordatorio/actualización
+ * @param {string} reminderData.cotizacionUrl - URL de la cotización (opcional)
+ * @returns {Object} Resultado del envío
+ */
+  async sendPaymentReminderEmail(reminderData) {
+    try {
+      console.log(`📧 Preparando email de recordatorio para ${reminderData.email}`);
+      console.log(`📊 Días transcurridos: ${reminderData.daysSincePayment}`);
+
+      const paymentReminderTemplates = require('./templates/paymentReminder');
+
+      // Determinar urgencia del recordatorio
+      const isUrgent = reminderData.daysSincePayment > 7;
+      const isCritical = reminderData.daysSincePayment > 10;
+
+      // Crear subject dinámico basado en urgencia
+      let subject = `⏰ Recordatorio: Pago pendiente para RMA #${reminderData.rmaId}`;
+
+      if (isCritical) {
+        subject = `🚨 URGENTE: Pago requerido para RMA #${reminderData.rmaId} (${reminderData.daysSincePayment} días)`;
+      } else if (isUrgent) {
+        subject = `⚠️ Recordatorio importante: Pago pendiente RMA #${reminderData.rmaId}`;
+      }
+
+      console.log(`📝 Subject del email: ${subject}`);
+
+      const result = await this._sendEmail({
+        to: [reminderData.email],
+        subject: subject,
+        html: paymentReminderTemplates.getPaymentReminderTemplate(reminderData),
+        text: paymentReminderTemplates.getPaymentReminderText(reminderData)
+      });
+
+      if (result.success) {
+        console.log(`✅ Email de recordatorio enviado exitosamente a ${reminderData.email}`);
+        console.log(`📧 Email ID: ${result.emailId}`);
+      } else {
+        console.error(`❌ Error enviando email de recordatorio a ${reminderData.email}:`, result.error);
+      }
+
+      return result;
+
+    } catch (error) {
+      console.error('❌ Error en sendPaymentReminderEmail:', error);
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
 
