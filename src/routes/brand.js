@@ -4,6 +4,7 @@ const express = require('express');
 const router = express.Router();
 
 const brandController = require('../controllers/brandController');
+const modelController = require('../controllers/modelController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { filterBrandsByRole, requireBrandModificationPermissions } = require('../middleware/brandPermissions');
 const { 
@@ -117,6 +118,16 @@ router.delete('/:id',
     validateDeleteBrand,                   // 3. Validar parámetros
     handleValidationErrors,                // 4. Manejar errores de validación
     brandController.deleteBrand            // 5. Ejecutar controlador
+);
+
+/**
+ * @route   GET /api/brands/:brandId/models
+ * @desc    Obtener modelos de una marca específica
+ * @access  Private - ALL authenticated users
+ */
+router.get('/:brandId/models',
+    authenticateToken,
+    modelController.getModelsByBrand
 );
 
 module.exports = router;

@@ -8,6 +8,7 @@ const rmaRoutes = require('./rma');
 const userRoutes = require('./users');
 const brandRoutes = require('./brand');
 const productRoutes = require('./products');
+const modelRoutes = require('./models');
 
 // Ruta de prueba inicial
 router.get('/test', (req, res) => {
@@ -26,6 +27,7 @@ router.use('/rma', rmaRoutes);
 router.use('/users', userRoutes);
 router.use('/brands', brandRoutes);
 router.use('/products', productRoutes);
+router.use('/models', modelRoutes);
 
 // Documentación básica de endpoints
 router.get('/docs', (req, res) => {

@@ -81,20 +81,37 @@ model Brand {
   // Relaciones
   countries BrandCountry[] // Países donde está disponible la marca
   products  Product[]      // Productos de esta marca
+  models    Model[]        // Modelos de esta marca
 
   @@map("brands")
+}
+
+model Model {
+  id        String    @id @default(cuid())
+  nombre    String
+  brandId   String
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @updatedAt
+
+  // Relaciones
+  brand    Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  products Product[] // Productos que usan este modelo
+
+  @@map("models")
 }
 
 model Product {
   id     String @id @default(cuid())
   nombre String
   brandId String
+  modelId String
   createdAt  DateTime?  @default(now())
   updatedAt       DateTime?  @updatedAt
   // Relaciones
   brand     Brand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  model     Model             @relation(fields: [modelId], references: [id], onDelete: Cascade)
   countries ProductCountry[]  // Países donde está disponible el producto
-  rmaItems  RmaProduct[]      // Productos en RMAs
+  rmaItems  RmaProduct[]
 
   @@map("products")
 }
@@ -170,7 +187,6 @@ model RmaProduct {
   productId           String
   serial              String
   reporteEvaluacion   String? // Reporte específico para este producto
-  model               String
 
   rma     Rma     @relation(fields: [rmaId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
