@@ -11,16 +11,22 @@ class ProductController {
      */
     async createProduct(req, res) {
         try {
-            const { nombre, brandId, countryIds = [] } = req.body;
-            
+            const { nombre, brandId, modelId, countryIds = [] } = req.body;
+
+            if (!nombre || !brandId || !modelId) {
+                return errorResponse(res, 'Nombre, marca y modelo son requeridos', 400);
+            }
+
             console.log(`🆕 Creando nuevo producto: ${nombre}`);
             console.log(`👤 Solicitado por: ${req.user.email} (${req.user.role})`);
             console.log(`🏷️ Marca: ${brandId}`);
+            console.log(`🏷️ Modelo: ${modelId}`);
             console.log(`🌍 Países asignados: ${countryIds.length} países`);
 
             const newProduct = await productService.createProduct({ 
                 nombre, 
                 brandId,
+                modelId,
                 countryIds 
             });
 
@@ -133,7 +139,7 @@ class ProductController {
     async updateProduct(req, res) {
         try {
             const { id } = req.params;
-            const { nombre, brandId, countryIds } = req.body;
+            const { nombre, brandId, countryIds, modelId } = req.body;
 
             console.log(`🔄 Actualizando producto ${id}`);
             console.log(`👤 Solicitado por: ${req.user.email} (${req.user.role})`);
@@ -141,6 +147,7 @@ class ProductController {
             const updatedProduct = await productService.updateProduct(id, {
                 nombre,
                 brandId,
+                modelId,
                 countryIds
             });
 

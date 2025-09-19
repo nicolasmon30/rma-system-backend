@@ -80,8 +80,7 @@ model Brand {
   updatedAt       DateTime?  @updatedAt
   // Relaciones
   countries BrandCountry[] // Países donde está disponible la marca
-  products  Product[]      // Productos de esta marca
-  models    Model[]        // Modelos de esta marca
+  products  Product[]      // Productos de esta marca       // Modelos de esta marca
 
   @@map("brands")
 }
@@ -92,10 +91,9 @@ model Model {
   brandId   String
   createdAt DateTime? @default(now())
   updatedAt DateTime? @updatedAt
-
+  productId String
   // Relaciones
-  brand    Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  products Product[] // Productos que usan este modelo
+  products Product @relation(fields: [productId], references: [id])
 
   @@map("models")
 }
@@ -108,8 +106,8 @@ model Product {
   createdAt  DateTime?  @default(now())
   updatedAt       DateTime?  @updatedAt
   // Relaciones
-  brand     Brand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  model     Model             @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  brand     Brand             @relation(fields: [brandId], references: [id])
+  models     Model[]
   countries ProductCountry[]  // Países donde está disponible el producto
   rmaItems  RmaProduct[]
 

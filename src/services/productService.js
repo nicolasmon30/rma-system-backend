@@ -9,7 +9,7 @@ class ProductService {
      * @param {Array} countryIds - IDs de países donde estará disponible el producto
      * @returns {Object} Producto creado
      */
-    async createProduct({ nombre, brandId, countryIds }) {
+    async createProduct({ nombre, brandId, countryIds, modelId }) {
         try {
             console.log("contriidsSelect", countryIds)
             // Verificar que el producto no exista
@@ -19,7 +19,8 @@ class ProductService {
                         equals: nombre,
                         mode: 'insensitive'
                     },
-                    brandId
+                    brandId,
+                    modelId
                 }
             });
 
@@ -34,6 +35,19 @@ class ProductService {
 
             if (!brand) {
                 throw new Error('La marca seleccionada no existe');
+            }
+
+            const model = await prisma.model.findUnique({
+                where: { id: modelId },
+                include: { brand: true }
+            });
+
+            if (!model) {
+                throw new Error('El modelo seleccionado no existe');
+            }
+
+            if (model.brandId !== brandId) {
+                throw new Error('El modelo no pertenece a la marca seleccionada');
             }
 
             // Verificar que los países existen
@@ -51,7 +65,7 @@ class ProductService {
             const newProduct = await prisma.$transaction(async (tx) => {
                 // 1. Crear el producto
                 const createdProduct = await tx.product.create({
-                    data: { nombre, brandId }
+                    data: { nombre, brandId, modelId }
                 });
 
                 // 2. Asignar países si se proporcionaron
@@ -69,6 +83,12 @@ class ProductService {
                     where: { id: createdProduct.id },
                     include: {
                         brand: {
+                            select: {
+                                id: true,
+                                nombre: true
+                            }
+                        },
+                        model: {
                             select: {
                                 id: true,
                                 nombre: true
@@ -114,7 +134,7 @@ class ProductService {
      */
     async listProducts(filters = {}, options = {}) {
         try {
-            const { page = 1, limit = 10, search = '', brandId = '' } = options;
+            const { page = 1, limit = 10, search = '', brandId = '', modelId = '' } = options;
             const skip = (page - 1) * limit;
 
             // Construir cláusula where
@@ -133,12 +153,23 @@ class ProductService {
                 whereClause.brandId = brandId;
             }
 
+            // Filtrar por modelo si se especifica
+            if (modelId) {
+                whereClause.modelId = modelId;
+            }
+
             // Ejecutar consulta con conteo total
             const [products, total] = await Promise.all([
                 prisma.product.findMany({
                     where: whereClause,
                     include: {
                         brand: {
+                            select: {
+                                id: true,
+                                nombre: true
+                            }
+                        },
+                        model: {
                             select: {
                                 id: true,
                                 nombre: true
@@ -164,6 +195,7 @@ class ProductService {
                     take: limit,
                     orderBy: [
                         { brand: { nombre: 'asc' } },
+                        { model: { nombre: 'asc' } },
                         { nombre: 'asc' }
                     ]
                 }),
@@ -210,6 +242,12 @@ class ProductService {
                             nombre: true
                         }
                     },
+                    model: {
+                        select: {
+                            id: true,
+                            nombre: true
+                        }
+                    },
                     countries: {
                         include: {
                             country: {
@@ -250,7 +288,7 @@ class ProductService {
      * @param {Object} updateData - Datos a actualizar
      * @returns {Object} Producto actualizado
      */
-    async updateProduct(productId, { nombre, brandId, countryIds }) {
+    async updateProduct(productId, { nombre, brandId, countryIds, modelId }) {
         try {
             // Verificar que el producto existe
             const existingProduct = await prisma.product.findUnique({
@@ -262,7 +300,7 @@ class ProductService {
             }
 
             // Verificar nombre duplicado (si se está cambiando)
-            if (nombre && nombre !== existingProduct.nombre) {
+            if (nombre && nombre !== existingProduct.nombre || brandId || modelId) {
                 const duplicateProduct = await prisma.product.findFirst({
                     where: {
                         nombre: {
@@ -270,6 +308,7 @@ class ProductService {
                             mode: 'insensitive'
                         },
                         brandId: brandId || existingProduct.brandId,
+                        modelId: modelId || existingProduct.modelId,
                         NOT: { id: productId }
                     }
                 });
@@ -287,6 +326,22 @@ class ProductService {
 
                 if (!brand) {
                     throw new Error('La marca seleccionada no existe');
+                }
+            }
+
+            if (modelId && modelId !== existingProduct.modelId) {
+                const model = await prisma.model.findUnique({
+                    where: { id: modelId },
+                    include: { brand: true }
+                });
+
+                if (!model) {
+                    throw new Error('El modelo seleccionado no existe');
+                }
+
+                const targetBrandId = brandId || existingProduct.brandId;
+                if (model.brandId !== targetBrandId) {
+                    throw new Error('El modelo no pertenece a la marca seleccionada');
                 }
             }
 
@@ -309,6 +364,7 @@ class ProductService {
                     data: {
                         ...(nombre && { nombre }),
                         ...(brandId && { brandId }),
+                        ...(modelId && { modelId }),
                         updatedAt: new Date()
                     }
                 });
@@ -336,6 +392,12 @@ class ProductService {
                     where: { id: productId },
                     include: {
                         brand: {
+                            select: {
+                                id: true,
+                                nombre: true
+                            }
+                        },
+                        model: {
                             select: {
                                 id: true,
                                 nombre: true
@@ -437,7 +499,7 @@ class ProductService {
      */
     async searchProducts(searchTerm, filters = {}, options = {}) {
         try {
-            const { limit = 20, brandId } = options;
+            const { limit = 20, brandId, modelId } = options;
 
             let whereClause = {
                 ...filters,
@@ -455,6 +517,14 @@ class ProductService {
                                 mode: 'insensitive'
                             }
                         }
+                    },
+                    {
+                        model: {
+                            nombre: {
+                                contains: searchTerm,
+                                mode: 'insensitive'
+                            }
+                        }
                     }
                 ]
             };
@@ -464,10 +534,20 @@ class ProductService {
                 whereClause.brandId = brandId;
             }
 
+            if (modelId) {
+                whereClause.modelId = modelId;
+            }
+
             const products = await prisma.product.findMany({
                 where: whereClause,
                 include: {
                     brand: {
+                        select: {
+                            id: true,
+                            nombre: true
+                        }
+                    },
+                    model: {
                         select: {
                             id: true,
                             nombre: true
@@ -492,6 +572,7 @@ class ProductService {
                 take: limit,
                 orderBy: [
                     { brand: { nombre: 'asc' } },
+                    { model: { nombre: 'asc' } },
                     { nombre: 'asc' }
                 ]
             });
@@ -529,6 +610,12 @@ class ProductService {
                             nombre: true
                         }
                     },
+                    model: {
+                        select: {
+                            id: true,
+                            nombre: true
+                        }
+                    },
                     countries: {
                         include: {
                             country: {
@@ -560,6 +647,66 @@ class ProductService {
             throw error;
         }
     }
+
+    /**
+     * Obtener productos por modelo
+     * @param {String} modelId - ID del modelo
+     * @param {Object} filters - Filtros adicionales
+     * @returns {Array} Productos del modelo
+     */
+    async getProductsByModel(modelId, filters = {}) {
+        try {
+            const products = await prisma.product.findMany({
+                where: {
+                    modelId,
+                    ...filters
+                },
+                include: {
+                    brand: {
+                        select: {
+                            id: true,
+                            nombre: true
+                        }
+                    },
+                    model: {
+                        select: {
+                            id: true,
+                            nombre: true
+                        }
+                    },
+                    countries: {
+                        include: {
+                            country: {
+                                select: {
+                                    id: true,
+                                    nombre: true
+                                }
+                            }
+                        }
+                    },
+                    _count: {
+                        select: {
+                            rmaItems: true
+                        }
+                    }
+                },
+                orderBy: {
+                    nombre: 'asc'
+                }
+            });
+
+            return products.map(product => ({
+                ...product,
+                countries: product.countries.map(pc => pc.country),
+                rmaCount: product._count.rmaItems
+            }));
+        } catch (error) {
+            console.error('Error obteniendo productos por modelo:', error);
+            throw error;
+        }
+    }
 }
+
+
 
 module.exports = new ProductService();
